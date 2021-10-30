@@ -6,10 +6,15 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
+import net.citizensnpcs.Citizens;
+import net.citizensnpcs.api.CitizensAPI;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
+import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
+import world.chiyogami.chiyogamilib.scheduler.WorldThreadRunnable;
 
 public class PlayerUpdateTask extends BukkitRunnable {
     private boolean playerTicking;
@@ -36,9 +41,14 @@ public class PlayerUpdateTask extends BukkitRunnable {
         Iterator<org.bukkit.entity.Entity> itr = TICKERS.values().iterator();
         while (itr.hasNext()) {
             Entity entity = itr.next();
-            if (NMS.tick(entity)) {
-                itr.remove();
-            }
+            new WorldThreadRunnable(entity.getWorld()){
+                @Override
+                public void run() {
+                    if (NMS.tick(entity)) {
+                        itr.remove();
+                    }
+                }
+            }.runTask((JavaPlugin) CitizensAPI.getPlugin());
         }
 
         for (Entity entity : PLAYERS_PENDING_REMOVE) {
@@ -52,9 +62,14 @@ public class PlayerUpdateTask extends BukkitRunnable {
 
         playerTicking = true;
         for (Player entity : PLAYERS.values()) {
-            if (entity.isValid()) {
-                NMS.playerTick(entity);
-            }
+            new WorldThreadRunnable(entity.getWorld()){
+                @Override
+                public void run() {
+                    if (entity.isValid()) {
+                        NMS.playerTick(entity);
+                    }
+                }
+            }.runTask((JavaPlugin) CitizensAPI.getPlugin());
         }
         playerTicking = false;
     }
@@ -87,7 +102,7 @@ public class PlayerUpdateTask extends BukkitRunnable {
     private static Map<UUID, org.bukkit.entity.Player> PLAYERS = new HashMap<UUID, org.bukkit.entity.Player>();
     private static List<org.bukkit.entity.Entity> PLAYERS_PENDING_ADD = new ArrayList<org.bukkit.entity.Entity>();
     private static List<org.bukkit.entity.Entity> PLAYERS_PENDING_REMOVE = new ArrayList<org.bukkit.entity.Entity>();
-    private static Map<UUID, org.bukkit.entity.Entity> TICKERS = new HashMap<UUID, org.bukkit.entity.Entity>();
+    private static Map<UUID, org.bukkit.entity.Entity> TICKERS = new ConcurrentHashMap<UUID, org.bukkit.entity.Entity>();
     private static List<org.bukkit.entity.Entity> TICKERS_PENDING_ADD = new ArrayList<org.bukkit.entity.Entity>();
     private static List<org.bukkit.entity.Entity> TICKERS_PENDING_REMOVE = new ArrayList<org.bukkit.entity.Entity>();
 }
